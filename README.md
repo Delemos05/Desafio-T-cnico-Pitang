@@ -35,7 +35,47 @@ npm install
 npm start
 ```
 
-## 🔐 Credenciais Padrão
+## � Docker
+
+### Iniciar com Docker Compose (Produção)
+```bash
+# Iniciar todos os serviços
+docker-compose up -d
+
+# Ver logs
+docker-compose logs -f
+
+# Parar
+docker-compose down
+```
+
+### Desenvolvimento com Docker
+```bash
+# Apenas banco de dados
+docker-compose -f docker-compose.dev.yml up -d
+
+# Rodar backend localmente
+cd backend && npm run dev
+
+# Rodar frontend localmente
+cd frontend && npm start
+```
+
+### Comandos úteis
+```bash
+# Rebuildar imagens
+docker-compose up -d --build
+
+# Resetar banco
+docker-compose down -v
+docker-compose up -d
+
+# Acessar container
+docker exec -it pitang-backend sh
+docker exec -it pitang-db psql -U pitang -d reimbursement
+```
+
+## �🔐 Credenciais Padrão
 
 - **ADMIN**: admin@email.com / 123456
 - **MANAGER**: manager@email.com / 123456

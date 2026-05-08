@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: pitang-db-dev
+    environment:
+      POSTGRES_USER: pitang
+      POSTGRES_PASSWORD: pitang123
+      POSTGRES_DB: reimbursement
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - pitang-network-dev
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  pitang-network-dev:
+    driver: bridge
