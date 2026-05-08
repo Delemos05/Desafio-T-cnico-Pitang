@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
-import { Category, Solicitation } from '../types';
 
 export default function SolicitationForm() {
   const [title, setTitle] = useState('');
@@ -11,8 +10,8 @@ export default function SolicitationForm() {
   const [date, setDate] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [justification, setJustification] = useState('');
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [solicitation, setSolicitation] = useState<Solicitation | null>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [solicitation, setSolicitation] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -30,9 +29,11 @@ export default function SolicitationForm() {
   const loadCategories = async () => {
     try {
       const data = await apiService.getCategories();
-      setCategories(data);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao carregar categorias');
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao carregar categorias');
+      setCategories([]);
     }
   };
 
@@ -50,8 +51,9 @@ export default function SolicitationForm() {
       setDate(new Date(data.date).toISOString().split('T')[0]);
       setCategoryId(data.category.id);
       setJustification(data.justification || '');
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao carregar solicitação');
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao carregar solicitação');
     }
   };
 
@@ -65,20 +67,21 @@ export default function SolicitationForm() {
         title,
         description,
         amount: parseFloat(amount),
-        date,
+        date: new Date(date).toISOString(),
         categoryId,
         justification: justification || undefined,
       };
 
       if (isEditing) {
-        await apiService.updateSolicitation(id!, solicitationData);
+        await apiService.updateSolicitation(id, solicitationData);
       } else {
         await apiService.createSolicitation(solicitationData);
       }
 
       navigate('/reimbursements');
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao salvar solicitação');
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao salvar solicitação');
     } finally {
       setIsLoading(false);
     }
@@ -155,7 +158,7 @@ export default function SolicitationForm() {
                 className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               >
                 <option value="">Selecione uma categoria</option>
-                {categories.map((category) => (
+                {Array.isArray(categories) && categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>

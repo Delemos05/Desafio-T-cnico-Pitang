@@ -1,12 +1,9 @@
-import { PrismaClient } from '@prisma/client';
 import { 
   CreateSolicitationInput, 
   UpdateSolicitationInput, 
   ApproveRejectInput 
 } from '../schemas/solicitation';
 import { 
-  SolicitationStatus, 
-  HistoryAction, 
   UserRole,
   AuthRequest 
 } from '../types';
@@ -17,8 +14,8 @@ import {
   InvalidStateTransitionError 
 } from '../utils/errors';
 import { canTransition } from '../utils/stateMachine';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
+import { SolicitationStatus, HistoryAction } from '@prisma/client';
 
 export class SolicitationService {
   async create(data: CreateSolicitationInput, userId: string) {
@@ -165,6 +162,15 @@ export class SolicitationService {
       throw new NotFoundError('Solicitação não encontrada');
     }
 
+    // Verifica se o usuário existe e tem permissão de MANAGER
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user || user.role !== UserRole.MANAGER) {
+      throw new ForbiddenError('Apenas gerentes podem aprovar solicitações');
+    }
+
     if (!canTransition(solicitation.status, SolicitationStatus.APPROVED, UserRole.MANAGER)) {
       throw new InvalidStateTransitionError(solicitation.status, SolicitationStatus.APPROVED);
     }
@@ -206,6 +212,15 @@ export class SolicitationService {
       throw new NotFoundError('Solicitação não encontrada');
     }
 
+    // Verifica se o usuário existe e tem permissão de MANAGER
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user || user.role !== UserRole.MANAGER) {
+      throw new ForbiddenError('Apenas gerentes podem rejeitar solicitações');
+    }
+
     if (!canTransition(solicitation.status, SolicitationStatus.REJECTED, UserRole.MANAGER)) {
       throw new InvalidStateTransitionError(solicitation.status, SolicitationStatus.REJECTED);
     }
@@ -245,6 +260,15 @@ export class SolicitationService {
 
     if (!solicitation) {
       throw new NotFoundError('Solicitação não encontrada');
+    }
+
+    // Verifica se o usuário existe e tem permissão de FINANCE
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user || user.role !== UserRole.FINANCE) {
+      throw new ForbiddenError('Apenas financeiro pode pagar solicitações');
     }
 
     if (!canTransition(solicitation.status, SolicitationStatus.PAID, UserRole.FINANCE)) {

@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
-import { Category, UserRole } from '../types';
+
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+}
 
 export default function CategoryList() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -20,8 +26,9 @@ export default function CategoryList() {
     try {
       const data = await apiService.getCategories();
       setCategories(data);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao carregar categorias');
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao carregar categorias');
     }
   };
 
@@ -48,27 +55,34 @@ export default function CategoryList() {
       } else {
         await apiService.createCategory(formData);
       }
+      setFormData({ name: '', description: '' });
       await loadCategories();
       setIsCreating(false);
       setEditingCategory(null);
-      setFormData({ name: '', description: '' });
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao salvar categoria');
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao salvar categoria');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja desativar esta categoria?')) {
+    if (!window.confirm('Tem certeza que deseja desativar esta categoria?')) {
       return;
     }
+
+    setIsLoading(true);
+    setError('');
 
     try {
       await apiService.deleteCategory(id);
       await loadCategories();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao desativar categoria');
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao desativar categoria');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -79,7 +93,7 @@ export default function CategoryList() {
     setError('');
   };
 
-  if (!hasRole([UserRole.ADMIN])) {
+  if (!hasRole(['ADMIN'])) {
     return (
       <div className="text-center">
         <p className="text-gray-500">Acesso negado</p>

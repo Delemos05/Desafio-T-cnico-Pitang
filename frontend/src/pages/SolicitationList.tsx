@@ -2,29 +2,41 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
-import { Solicitation, SolicitationStatus, UserRole } from '../types';
-import { statusColors, statusLabels, formatCurrency, formatDate, canUserPerformAction } from '../utils/statusUtils';
+import { usePaginatedData } from '../hooks/usePaginatedData';
+import Pagination from '../components/Pagination';
+import SolicitationFilters from '../components/SolicitationFilters';
 
 export default function SolicitationList() {
-  const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filters, setFilters] = useState({});
   const { user, hasRole } = useAuth();
 
-  useEffect(() => {
-    loadSolicitations();
-  }, []);
+  // Hook personalizado para paginação com filtros
+  const {
+    data: solicitations,
+    loading: isLoading,
+    error: hookError,
+    pagination,
+    handlePageChange,
+    handleFiltersChange,
+    refresh
+  } = usePaginatedData(
+    async (page, limit, currentFilters) => {
+      // API service agora suporta paginação e filtros
+      const response = await apiService.getSolicitations(page, limit, currentFilters);
+      return response;
+    },
+    1,
+    10, // 10 itens por página para demonstração
+    filters // filtros iniciais
+  );
 
-  const loadSolicitations = async () => {
-    try {
-      const data = await apiService.getSolicitations();
-      setSolicitations(data);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao carregar solicitações');
-    } finally {
-      setIsLoading(false);
+  // Sincroniza erros
+  useEffect(() => {
+    if (hookError) {
+      setError(hookError);
     }
-  };
+  }, [hookError]);
 
   const handleAction = async (id: string, action: string, observation?: string) => {
     try {
@@ -44,15 +56,19 @@ export default function SolicitationList() {
         case 'cancel':
           await apiService.cancelSolicitation(id);
           break;
+        default:
+          console.warn('Unknown action:', action);
       }
-      await loadSolicitations();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao executar ação');
+      // Recarrega os dados usando refresh do hook
+      refresh();
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao executar ação');
     }
   };
 
-  const handleApproveReject = async (id: string, action: 'approve' | 'reject') => {
-    const observation = prompt(`Motivo da ${action === 'approve' ? 'aprovação' : 'rejeição'}:`);
+  const handleApproveReject = async (id: string, action: string) => {
+    const observation = window.prompt(`Motivo da ${action === 'approve' ? 'aprovação' : 'rejeição'}:`);
     if (observation) {
       await handleAction(id, action, observation);
     }
@@ -66,12 +82,70 @@ export default function SolicitationList() {
     );
   }
 
+  const statusColors: Record<string, string> = {
+    DRAFT: 'bg-gray-100 text-gray-800',
+    SUBMITTED: 'bg-blue-100 text-blue-800',
+    APPROVED: 'bg-green-100 text-green-800',
+    REJECTED: 'bg-red-100 text-red-800',
+    PAID: 'bg-purple-100 text-purple-800',
+    CANCELED: 'bg-yellow-100 text-yellow-800',
+  };
+
+  const statusLabels: Record<string, string> = {
+    DRAFT: 'Rascunho',
+    SUBMITTED: 'Enviado',
+    APPROVED: 'Aprovado',
+    REJECTED: 'Rejeitado',
+    PAID: 'Pago',
+    CANCELED: 'Cancelado',
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(amount);
+  };
+
+  const canPerformAction = (userRole: string, status: string, action: string, isOwner?: boolean) => {
+    switch (action) {
+      case 'edit':
+      case 'submit':
+      case 'cancel':
+        return status === 'DRAFT' && (action === 'edit' ? isOwner : true);
+      case 'approve':
+      case 'reject':
+        return status === 'SUBMITTED' && userRole === 'MANAGER';
+      case 'pay':
+        return status === 'APPROVED' && userRole === 'FINANCE';
+      default:
+        return false;
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Solicitações de Reembolso</h1>
-          {hasRole([UserRole.EMPLOYEE]) && (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Solicitações de Reembolso</h1>
+          </div>
+
+          {/* Componente de Filtros */}
+          <SolicitationFilters 
+            onFiltersChange={handleFiltersChange}
+            currentFilters={filters}
+          />
+          {hasRole(['EMPLOYEE']) && (
             <Link
               to="/reimbursements/new"
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
@@ -162,8 +236,8 @@ export default function SolicitationList() {
                             Ver
                           </Link>
                           
-                          {canUserPerformAction(
-                            user?.role || UserRole.EMPLOYEE,
+                          {canPerformAction(
+                            user?.role || 'EMPLOYEE',
                             solicitation.status,
                             'edit',
                             isOwner
@@ -176,8 +250,8 @@ export default function SolicitationList() {
                             </Link>
                           )}
                           
-                          {canUserPerformAction(
-                            user?.role || UserRole.EMPLOYEE,
+                          {canPerformAction(
+                            user?.role || 'EMPLOYEE',
                             solicitation.status,
                             'submit',
                             isOwner
@@ -190,8 +264,8 @@ export default function SolicitationList() {
                             </button>
                           )}
                           
-                          {canUserPerformAction(
-                            user?.role || UserRole.EMPLOYEE,
+                          {canPerformAction(
+                            user?.role || 'EMPLOYEE',
                             solicitation.status,
                             'approve',
                             isOwner
@@ -204,8 +278,8 @@ export default function SolicitationList() {
                             </button>
                           )}
                           
-                          {canUserPerformAction(
-                            user?.role || UserRole.EMPLOYEE,
+                          {canPerformAction(
+                            user?.role || 'EMPLOYEE',
                             solicitation.status,
                             'reject',
                             isOwner
@@ -218,8 +292,8 @@ export default function SolicitationList() {
                             </button>
                           )}
                           
-                          {canUserPerformAction(
-                            user?.role || UserRole.EMPLOYEE,
+                          {canPerformAction(
+                            user?.role || 'EMPLOYEE',
                             solicitation.status,
                             'pay',
                             isOwner
@@ -232,8 +306,8 @@ export default function SolicitationList() {
                             </button>
                           )}
                           
-                          {canUserPerformAction(
-                            user?.role || UserRole.EMPLOYEE,
+                          {canPerformAction(
+                            user?.role || 'EMPLOYEE',
                             solicitation.status,
                             'cancel',
                             isOwner
@@ -254,6 +328,15 @@ export default function SolicitationList() {
             </table>
           )}
         </div>
+        
+        {/* Componente de Paginação */}
+        <Pagination
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={handlePageChange}
+          hasNext={pagination.hasNext}
+          hasPrev={pagination.hasPrev}
+        />
       </div>
     </div>
   );

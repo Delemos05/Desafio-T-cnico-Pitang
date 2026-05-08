@@ -10,7 +10,11 @@ import SolicitationDetail from './pages/SolicitationDetail';
 import CategoryList from './pages/CategoryList';
 import './index.css';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -28,7 +32,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <Layout>{children}</Layout>;
 }
 
-function PublicRoute({ children }: { children: React.ReactNode }) {
+interface PublicRouteProps {
+  children: React.ReactNode;
+}
+
+function PublicRoute({ children }: PublicRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -43,7 +51,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return children;
+  return <>{children}</>;
 }
 
 function App() {

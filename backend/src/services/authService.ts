@@ -1,11 +1,10 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 import { UserRole } from '../types';
-import { UnauthorizedError, ValidationError } from '../utils/errors';
+import { UnauthorizedError, ValidationError, ForbiddenError } from '../utils/errors';
 import { randomBytes } from 'crypto';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
+import { CreateUserInput } from '../schemas/auth';
 
 export class AuthService {
   async login(email: string, password: string) {
@@ -22,15 +21,23 @@ export class AuthService {
       throw new UnauthorizedError('Credenciais inválidas');
     }
 
+    // Validação das variáveis de ambiente
+    const jwtSecret = process.env.JWT_SECRET;
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+    
+    if (!jwtSecret || !jwtRefreshSecret) {
+      throw new Error('JWT_SECRET and JWT_REFRESH_SECRET environment variables are required');
+    }
+
     const accessToken = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
+      jwtSecret,
       { expiresIn: '15m' }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id, type: 'refresh' },
-      process.env.JWT_REFRESH_SECRET!,
+      jwtRefreshSecret,
       { expiresIn: '7d' }
     );
 
@@ -53,8 +60,13 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
+    const jwtRefreshSecretEnv = process.env.JWT_REFRESH_SECRET;
+    if (!jwtRefreshSecretEnv) {
+      throw new Error('JWT_REFRESH_SECRET environment variable is required');
+    }
+    
     try {
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any;
+      const decoded = jwt.verify(refreshToken, jwtRefreshSecretEnv) as any;
       
       if (decoded.type !== 'refresh') {
         throw new UnauthorizedError('Token inválido');
@@ -71,15 +83,22 @@ export class AuthService {
         throw new UnauthorizedError('Token inválido ou expirado');
       }
 
+      const jwtSecret = process.env.JWT_SECRET;
+      const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+      
+      if (!jwtSecret || !jwtRefreshSecret) {
+        throw new Error('JWT secrets not configured');
+      }
+
       const newAccessToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET!,
+        jwtSecret,
         { expiresIn: '15m' }
       );
 
       const newRefreshToken = jwt.sign(
         { id: user.id, type: 'refresh' },
-        process.env.JWT_REFRESH_SECRET!,
+        jwtRefreshSecret,
         { expiresIn: '7d' }
       );
 
@@ -100,8 +119,13 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!jwtRefreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET environment variable is required');
+    }
+    
     try {
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any;
+      const decoded = jwt.verify(refreshToken, jwtRefreshSecret) as any;
       
       // Remove refresh token do banco (invalida)
       await prisma.user.update({
@@ -110,7 +134,8 @@ export class AuthService {
       });
 
     } catch (error) {
-      // Token inválido, mas não faz nada
+      // Token inválido, loga para debugging
+      console.error('Logout error: Invalid refresh token');
     }
   }
 

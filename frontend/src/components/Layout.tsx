@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserRole } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -51,7 +50,7 @@ export function Layout({ children }: LayoutProps) {
                 >
                   Solicitações
                 </Link>
-                {hasRole([UserRole.ADMIN]) && (
+                {hasRole(['ADMIN'] as string[]) && (
                   <Link
                     to="/categories"
                     className={`${

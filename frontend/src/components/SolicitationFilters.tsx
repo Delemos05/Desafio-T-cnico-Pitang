@@ -2,9 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
 
-export default function SolicitationFilters({ onFiltersChange, currentFilters }) {
-  const [categories, setCategories] = useState([]);
-  const [users, setUsers] = useState([]);
+interface SolicitationFiltersProps {
+  onFiltersChange: (filters: Record<string, any>) => void;
+  currentFilters: Record<string, any>;
+}
+
+export default function SolicitationFilters({ onFiltersChange, currentFilters }: SolicitationFiltersProps) {
+  const [categories, setCategories] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const { user, hasRole } = useAuth();
@@ -12,7 +17,7 @@ export default function SolicitationFilters({ onFiltersChange, currentFilters })
   useEffect(() => {
     if (!categoriesLoaded) {
       loadCategories();
-      if (hasRole(['ADMIN', 'MANAGER'])) {
+      if (hasRole(['ADMIN', 'MANAGER'] as string[])) {
         loadUsers();
       }
     }
@@ -27,10 +32,10 @@ export default function SolicitationFilters({ onFiltersChange, currentFilters })
       setCategoriesLoaded(true);
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
-      setCategories([]); // Define array vazio em caso de erro
-      setCategoriesLoaded(true); // Marca como carregado mesmo com erro para evitar loops
     } finally {
       setIsLoading(false);
+      setCategories([]); // Define array vazio em caso de erro
+      setCategoriesLoaded(true); // Marca como carregado mesmo com erro para evitar loops
     }
   };
 
@@ -49,7 +54,7 @@ export default function SolicitationFilters({ onFiltersChange, currentFilters })
     }
   };
 
-  const handleFilterChange = (field, value) => {
+  const handleFilterChange = (field: string, value: any) => {
     const newFilters = {
       ...currentFilters,
       [field]: value || undefined

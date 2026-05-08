@@ -1,4 +1,4 @@
-import { SolicitationStatus, UserRole } from '../types';
+import { SolicitationStatus, UserRole } from '@prisma/client';
 
 export const stateTransitions: Record<SolicitationStatus, {
   allowed: SolicitationStatus[];

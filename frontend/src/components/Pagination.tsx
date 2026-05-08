@@ -1,5 +1,14 @@
 import React from 'react';
 
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  hasNext: boolean;
+  hasPrev: boolean;
+  showOnlyIfNeeded?: boolean;
+}
+
 export default function Pagination({ 
   currentPage, 
   totalPages, 
@@ -7,7 +16,7 @@ export default function Pagination({
   hasNext, 
   hasPrev,
   showOnlyIfNeeded = true 
-}) {
+}: PaginationProps) {
   // Se não houver paginação necessária, não mostrar
   if (showOnlyIfNeeded && totalPages <= 1) {
     return null;

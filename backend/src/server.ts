@@ -11,12 +11,27 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3333;
 
-app.use(cors());
+// CORS configurado para permitir apenas origens específicas
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permite requests sem origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 
 app.use('/auth', authRoutes);
 app.use('/solicitations', solicitationRoutes);
-app.use('/reimbursements', solicitationRoutes);
 app.use('/categories', categoryRoutes);
 
 app.use(errorHandler);

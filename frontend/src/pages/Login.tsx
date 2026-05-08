@@ -18,7 +18,8 @@ export default function Login() {
     try {
       await login(email, password);
       navigate('/dashboard');
-    } catch (err: any) {
+    } catch (error) {
+      const err = error as any;
       setError(err.response?.data?.message || 'Erro ao fazer login');
     } finally {
       setIsLoading(false);

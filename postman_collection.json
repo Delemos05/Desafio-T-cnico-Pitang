@@ -1,0 +1,441 @@
+{
+	"info": {
+		"_postman_id": "pitang-reimbursement-api",
+		"name": "Pitang Reimbursement API",
+		"description": "API completa do sistema de reembolso com autenticação JWT e RBAC",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3333",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "solicitationId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "categoryId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "🔐 Autenticação",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+									"    pm.collectionVariables.set('userId', response.data.user.id);",
+									"    console.log('✅ Login realizado com sucesso!');",
+									"    console.log('👤 Usuário:', response.data.user.name);",
+									"    console.log('🔑 Role:', response.data.user.role);",
+									"} else {",
+									"    console.log('❌ Falha no login:', pm.response.json());",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@email.com\",\n    \"password\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Realiza login no sistema"
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+									"    console.log('🔄 Token atualizado com sucesso!');",
+									"} else {",
+									"    console.log('❌ Falha ao atualizar token');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"refresh"
+							]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    pm.collectionVariables.unset('accessToken');",
+									"    pm.collectionVariables.unset('refreshToken');",
+									"    pm.collectionVariables.unset('userId');",
+									"    console.log('👋 Logout realizado com sucesso!');",
+									"} else {",
+									"    console.log('❌ Falha no logout');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/logout",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/auth/profile",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"profile"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📋 Solicitações",
+			"item": [
+				{
+					"name": "List Solicitations",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.data && response.data.data && response.data.data.length > 0) {",
+									"        pm.collectionVariables.set('solicitationId', response.data.data[0].id);",
+									"        console.log('📋 Solicitações carregadas:', response.data.data.length);",
+									"    } else {",
+									"        console.log('📋 Nenhuma solicitação encontrada');",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/solicitations?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"solicitations"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Solicitation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set('solicitationId', response.data.id);",
+									"    console.log('✅ Solicitação criada:', response.data.id);",
+									"} else {",
+									"    console.log('❌ Falha ao criar solicitação');",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Solicitação de Teste\",\n    \"description\": \"Descrição detalhada da solicitação\",\n    \"amount\": 150.50,\n    \"date\": \"2024-01-15\",\n    \"categoryId\": \"{{categoryId}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/solicitations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"solicitations"
+							]
+						}
+					}
+				},
+				{
+					"name": "Submit Solicitation",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/solicitations/{{solicitationId}}/submit",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"solicitations",
+								"{{solicitationId}}",
+								"submit"
+							]
+						}
+					}
+				},
+				{
+					"name": "Approve Solicitation",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"observation\": \"Aprovado após análise detalhada.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/solicitations/{{solicitationId}}/approve",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"solicitations",
+								"{{solicitationId}}",
+								"approve"
+							]
+						}
+					}
+				},
+				{
+					"name": "Pay Solicitation",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/solicitations/{{solicitationId}}/pay",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"solicitations",
+								"{{solicitationId}}",
+								"pay"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🏷️ Categorias",
+			"item": [
+				{
+					"name": "List Categories",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.data && response.data.length > 0) {",
+									"        pm.collectionVariables.set('categoryId', response.data[0].id);",
+									"        console.log('🏷️ Categorias carregadas:', response.data.length);",
+									"    } else {",
+									"        console.log('🏷️ Nenhuma categoria encontrada');",
+									"    }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/categories",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories"
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Nova Categoria\",\n    \"description\": \"Descrição da nova categoria\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/categories",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"console.log(`📡 ${pm.info.requestName} - ${pm.info.requestMethod} ${pm.info.requestUrl}`);"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"exec": [
+					"if (pm.response.code >= 400) {",
+					"    console.log(`❌ Erro ${pm.response.code}:`, pm.response.json());",
+					"} else if (pm.response.code >= 200 && pm.response.code < 300) {",
+					"    console.log(`✅ Sucesso ${pm.response.code}`);",
+					"}"
+				]
+			}
+		}
+	]
+}

@@ -3,29 +3,42 @@ import { Request, Response, NextFunction } from 'express';
 import { UserRole, AuthRequest } from '../types';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+// Validação estrita das variáveis de ambiente
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    throw new UnauthorizedError('Token não fornecido');
-  }
-
-  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
-    if (err) {
-      throw new UnauthorizedError('Token inválido');
+    if (!token) {
+      throw new UnauthorizedError('Token não fornecido');
     }
 
-    req.user = {
-      id: decoded.id,
-      email: decoded.email,
-      role: decoded.role
-    };
+    jwt.verify(token, JWT_SECRET, (err: jwt.VerifyErrors | null, decoded: jwt.JwtPayload | string | undefined) => {
+      if (err) {
+        return next(new UnauthorizedError('Token inválido ou expirado'));
+      }
 
-    next();
-  });
+      if (typeof decoded !== 'object' || !decoded) {
+        return next(new UnauthorizedError('Token inválido'));
+      }
+
+      req.user = {
+        id: decoded.id as string,
+        email: decoded.email as string,
+        role: decoded.role as UserRole
+      };
+
+      next();
+    });
+  } catch (error) {
+    next(error);
+  }
 }
 
 export function requireRole(allowedRoles: UserRole[]) {

@@ -2,23 +2,48 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
-import { Solicitation, History, UserRole } from '../types';
-import { 
-  statusColors, 
-  statusLabels, 
-  formatDate, 
-  formatCurrency,
-  canUserPerformAction 
-} from '../utils/statusUtils';
+
+interface Solicitation {
+  id: string;
+  title: string;
+  description: string;
+  amount: number;
+  date: string;
+  createdAt: string;
+  status: string;
+  justification?: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  category: {
+    id: string;
+    name: string;
+    description: string;
+  };
+}
+
+interface HistoryItem {
+  id: string;
+  action: string;
+  user: {
+    id: string;
+    name: string;
+  };
+  createdAt: string;
+  observation?: string;
+}
 
 export default function SolicitationDetail() {
   const [solicitation, setSolicitation] = useState<Solicitation | null>(null);
-  const [history, setHistory] = useState<History[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isActionLoading, setIsActionLoading] = useState(false);
   const [error, setError] = useState('');
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
 
   useEffect(() => {
     if (id) {
@@ -34,24 +59,24 @@ export default function SolicitationDetail() {
       ]);
       setSolicitation(solicitationData);
       setHistory(historyData);
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao carregar solicitação');
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao carregar solicitação');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleAction = async (action: string, observation?: string) => {
+    setIsActionLoading(true);
+    setError('');
     try {
       switch (action) {
-        case 'submit':
-          await apiService.submitSolicitation(id!);
-          break;
         case 'approve':
-          await apiService.approveSolicitation(id!, observation || '');
+          await apiService.approveSolicitation(id!, observation);
           break;
         case 'reject':
-          await apiService.rejectSolicitation(id!, observation || '');
+          await apiService.rejectSolicitation(id!, observation);
           break;
         case 'pay':
           await apiService.paySolicitation(id!);
@@ -59,15 +84,20 @@ export default function SolicitationDetail() {
         case 'cancel':
           await apiService.cancelSolicitation(id!);
           break;
+        default:
+          console.warn('Unknown action:', action);
       }
       await loadData();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao executar ação');
+    } catch (error) {
+      const err = error as any;
+      setError(err.response?.data?.message || 'Erro ao executar ação');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
-  const handleApproveReject = async (action: 'approve' | 'reject') => {
-    const observation = prompt(`Motivo da ${action === 'approve' ? 'aprovação' : 'rejeição'}:`);
+  const handleApproveReject = async (action: string) => {
+    const observation = window.prompt(`Motivo da ${action === 'approve' ? 'aprovação' : 'rejeição'}:`);
     if (observation) {
       await handleAction(action, observation);
     }
@@ -90,6 +120,48 @@ export default function SolicitationDetail() {
   }
 
   const isOwner = user?.id === solicitation.user.id;
+  
+  const statusColors: Record<string, string> = {
+    DRAFT: 'bg-gray-100 text-gray-800',
+    SUBMITTED: 'bg-blue-100 text-blue-800',
+    APPROVED: 'bg-green-100 text-green-800',
+    REJECTED: 'bg-red-100 text-red-800',
+    PAID: 'bg-purple-100 text-purple-800',
+    CANCELED: 'bg-yellow-100 text-yellow-800',
+  };
+
+  const statusLabels: Record<string, string> = {
+    DRAFT: 'Rascunho',
+    SUBMITTED: 'Enviado',
+    APPROVED: 'Aprovado',
+    REJECTED: 'Rejeitado',
+    PAID: 'Pago',
+    CANCELED: 'Cancelado',
+  };
+
+  const canShowEdit = isOwner && solicitation.status === 'DRAFT';
+  const canShowSubmit = isOwner && solicitation.status === 'DRAFT';
+  const canShowApprove = hasRole(['MANAGER'] as string[]) && solicitation.status === 'SUBMITTED';
+  const canShowReject = hasRole(['MANAGER'] as string[]) && solicitation.status === 'SUBMITTED';
+  const canShowPay = hasRole(['FINANCE'] as string[]) && solicitation.status === 'APPROVED';
+  const canShowCancel = (isOwner && solicitation.status === 'DRAFT') || 
+                         (hasRole(['MANAGER'] as string[]) && solicitation.status === 'SUBMITTED');
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(amount);
+  };
 
   return (
     <div className="space-y-6">
@@ -160,87 +232,63 @@ export default function SolicitationDetail() {
         </div>
 
         <div className="mt-8 flex flex-wrap gap-3">
-          {canUserPerformAction(
-            user?.role || UserRole.EMPLOYEE,
-            solicitation.status,
-            'edit',
-            isOwner
-          ) && (
+          {canShowEdit && (
             <Link
               to={`/reimbursements/${solicitation.id}/edit`}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ pointerEvents: isActionLoading ? 'none' : 'auto' }}
             >
               Editar
             </Link>
           )}
 
-          {canUserPerformAction(
-            user?.role || UserRole.EMPLOYEE,
-            solicitation.status,
-            'submit',
-            isOwner
-          ) && (
+          {canShowSubmit && (
             <button
               onClick={() => handleAction('submit')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+              disabled={isActionLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Enviar para Aprovação
+              {isActionLoading ? 'Processando...' : 'Enviar para Aprovação'}
             </button>
           )}
 
-          {canUserPerformAction(
-            user?.role || UserRole.EMPLOYEE,
-            solicitation.status,
-            'approve',
-            isOwner
-          ) && (
+          {canShowApprove && (
             <button
               onClick={() => handleApproveReject('approve')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+              disabled={isActionLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Aprovar
+              {isActionLoading ? 'Processando...' : 'Aprovar'}
             </button>
           )}
 
-          {canUserPerformAction(
-            user?.role || UserRole.EMPLOYEE,
-            solicitation.status,
-            'reject',
-            isOwner
-          ) && (
+          {canShowReject && (
             <button
               onClick={() => handleApproveReject('reject')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+              disabled={isActionLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Rejeitar
+              {isActionLoading ? 'Processando...' : 'Rejeitar'}
             </button>
           )}
 
-          {canUserPerformAction(
-            user?.role || UserRole.EMPLOYEE,
-            solicitation.status,
-            'pay',
-            isOwner
-          ) && (
+          {canShowPay && (
             <button
               onClick={() => handleAction('pay')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
+              disabled={isActionLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Pagar
+              {isActionLoading ? 'Processando...' : 'Pagar'}
             </button>
           )}
 
-          {canUserPerformAction(
-            user?.role || UserRole.EMPLOYEE,
-            solicitation.status,
-            'cancel',
-            isOwner
-          ) && (
+          {canShowCancel && (
             <button
               onClick={() => handleAction('cancel')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700"
+              disabled={isActionLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancelar
+              {isActionLoading ? 'Processando...' : 'Cancelar'}
             </button>
           )}
         </div>

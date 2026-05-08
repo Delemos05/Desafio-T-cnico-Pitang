@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiService from '../services/api';
-import { Solicitation, SolicitationStatus } from '../types';
-import { statusColors, statusLabels, formatCurrency, formatDate } from '../utils/statusUtils';
+
+interface Solicitation {
+  id: string;
+  status: string;
+  amount: number;
+  title: string;
+  date: string;
+}
 
 export default function Dashboard() {
   const [solicitations, setSolicitations] = useState<Solicitation[]>([]);
@@ -25,11 +31,11 @@ export default function Dashboard() {
     }
   };
 
-  const getStatusCount = (status: SolicitationStatus) => {
+  const getStatusCount = (status: string) => {
     return solicitations.filter(s => s.status === status).length;
   };
 
-  const getTotalAmount = (status: SolicitationStatus) => {
+  const getTotalAmount = (status: string) => {
     return solicitations
       .filter(s => s.status === status)
       .reduce((total, s) => total + s.amount, 0);
@@ -44,6 +50,40 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const statusColors: Record<string, string> = {
+    DRAFT: 'bg-gray-100 text-gray-800',
+    SUBMITTED: 'bg-blue-100 text-blue-800',
+    APPROVED: 'bg-green-100 text-green-800',
+    REJECTED: 'bg-red-100 text-red-800',
+    PAID: 'bg-purple-100 text-purple-800',
+    CANCELED: 'bg-yellow-100 text-yellow-800',
+  };
+
+  const statusLabels: Record<string, string> = {
+    DRAFT: 'Rascunho',
+    SUBMITTED: 'Enviado',
+    APPROVED: 'Aprovado',
+    REJECTED: 'Rejeitado',
+    PAID: 'Pago',
+    CANCELED: 'Cancelado',
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(amount);
+  };
 
   return (
     <div className="space-y-6">
@@ -60,48 +100,45 @@ export default function Dashboard() {
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-500">Rascunhos</h3>
           <p className="mt-2 text-3xl font-bold text-gray-900">
-            {getStatusCount(SolicitationStatus.DRAFT)}
+            {getStatusCount('DRAFT')}
           </p>
           <p className="mt-1 text-sm text-gray-600">
-            {formatCurrency(getTotalAmount(SolicitationStatus.DRAFT))}
+            {formatCurrency(getTotalAmount('DRAFT'))}
           </p>
         </div>
 
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-500">Enviados</h3>
           <p className="mt-2 text-3xl font-bold text-blue-600">
-            {getStatusCount(SolicitationStatus.SUBMITTED)}
+            {getStatusCount('SUBMITTED')}
           </p>
           <p className="mt-1 text-sm text-gray-600">
-            {formatCurrency(getTotalAmount(SolicitationStatus.SUBMITTED))}
+            {formatCurrency(getTotalAmount('SUBMITTED'))}
           </p>
         </div>
 
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-500">Aprovados</h3>
           <p className="mt-2 text-3xl font-bold text-green-600">
-            {getStatusCount(SolicitationStatus.APPROVED)}
+            {getStatusCount('APPROVED')}
           </p>
           <p className="mt-1 text-sm text-gray-600">
-            {formatCurrency(getTotalAmount(SolicitationStatus.APPROVED))}
+            {formatCurrency(getTotalAmount('APPROVED'))}
           </p>
         </div>
 
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-500">Pagos</h3>
           <p className="mt-2 text-3xl font-bold text-purple-600">
-            {getStatusCount(SolicitationStatus.PAID)}
+            {getStatusCount('PAID')}
           </p>
           <p className="mt-1 text-sm text-gray-600">
-            {formatCurrency(getTotalAmount(SolicitationStatus.PAID))}
+            {formatCurrency(getTotalAmount('PAID'))}
           </p>
         </div>
       </div>
 
       <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Solicitações Recentes</h2>
-        </div>
         <div className="overflow-hidden">
           {recentSolicitations.length === 0 ? (
             <div className="px-6 py-4 text-center text-gray-500">
@@ -169,7 +206,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {hasRole(['EMPLOYEE']) && (
+      {hasRole(['EMPLOYEE'] as string[]) && (
         <div className="bg-white shadow rounded-lg p-6">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Ações Rápidas</h2>
           <div className="space-x-4">

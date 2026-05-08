@@ -1,79 +1,154 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, UserRole } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import apiService from '../services/api';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  isRefreshing: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  hasRole: (roles: UserRole[]) => boolean;
+  refreshToken: () => Promise<string | null>;
+  hasRole: (roles: string | string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 interface AuthProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
+    const storedRefreshToken = localStorage.getItem('refreshToken');
     const storedUser = localStorage.getItem('user');
 
     if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      try {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('refreshToken');
+      }
     }
     setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
+      setIsLoading(true);
       const response = await apiService.login(email, password);
       
-      setToken(response.token);
-      setUser(response.user);
-      
-      localStorage.setItem('token', response.token);
+      // Salva tokens no localStorage
+      localStorage.setItem('token', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
       localStorage.setItem('user', JSON.stringify(response.user));
+      
+      setToken(response.accessToken);
+      setUser(response.user);
     } catch (error) {
+      console.error('Login error:', error);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  };
+  const logout = useCallback(() => {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        // Chama endpoint de logout para invalidar refresh token
+        apiService.logout(refreshToken);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Limpa localStorage e estado
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      setToken(null);
+      setUser(null);
+    }
+  }, []);
 
-  const hasRole = (roles: UserRole[]): boolean => {
+  const refreshAccessToken = useCallback(async () => {
+    if (isRefreshing || !token) return;
+
+    try {
+      setIsRefreshing(true);
+      const refreshToken = localStorage.getItem('refreshToken');
+      
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await apiService.refreshToken(refreshToken);
+      
+      // Atualiza tokens no localStorage
+      localStorage.setItem('token', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
+      setToken(response.accessToken);
+      
+      return response.accessToken;
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      
+      // Se falhar o refresh, faz logout
+      logout();
+      throw error;
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [token, isRefreshing, logout]);
+
+  const hasRole = (roles: string | string[]) => {
     if (!user) return false;
-    return roles.includes(user.role);
+    return Array.isArray(roles) 
+      ? roles.includes(user.role)
+      : user.role === roles;
   };
 
+  const isAuthenticated = !!token && !!user;
+  
   const value: AuthContextType = {
     user,
     token,
+    isLoading,
+    isRefreshing,
+    isAuthenticated,
     login,
     logout,
-    isLoading,
-    isAuthenticated: !!token,
-    hasRole,
+    refreshToken: refreshAccessToken,
+    hasRole
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export function useAuth(): AuthContextType {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
