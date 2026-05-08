@@ -131,20 +131,3 @@ npm test
 cd frontend
 npm test
 ```
-
-## 📋 Checklist de Implementação
-
-- [x] Login funciona
-- [x] JWT protege rotas
-- [x] CRUD funcionando
-- [x] Estados corretos
-- [x] Histórico em todas ações
-- [x] RBAC funcionando
-- [x] Validações completas
-- [x] Status HTTP corretos
-- [x] Frontend funcional
-- [x] Erros visíveis
-- [x] Loop de carregamento resolvido
-- [x] Autenticação persistente
-- [x] Paginação implementada
-- [x] Filtros funcionando
